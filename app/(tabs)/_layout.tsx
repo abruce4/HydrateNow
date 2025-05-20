@@ -79,32 +79,41 @@ export default function MobileNav() {
       Object.keys(videoPlayersRef.current).forEach((key) => {
         const player = videoPlayersRef.current[key];
         if (player) {
-          player.volume = 0.01; // Keep low volume for this process
-          player.play(); // play() is void, no promise returned
+          try {
+            player.volume = 0.01; // Keep low volume for this process
+            player.play(); // play() is void, no promise returned
 
-          // Directly manage state after attempting to play
-          // This simplified logic might need further refinement based on actual behavior without promises
-          if (key !== activeTab || initialActiveTabPlayed) {
-            setTimeout(() => {
-              player.pause();
-              player.currentTime = 0;
+            // Directly manage state after attempting to play
+            if (key !== activeTab || initialActiveTabPlayed) {
+              setTimeout(() => {
+                if (videoPlayersRef.current[key]) { // Re-check player in timeout
+                  videoPlayersRef.current[key]!.pause();
+                  videoPlayersRef.current[key]!.currentTime = 0;
+                  videoPlayersRef.current[key]!.volume = 1;
+                }
+              }, 50);
+            } else if (key === activeTab && !initialActiveTabPlayed) {
               player.volume = 1;
-            }, 50);
-          } else if (key === activeTab && !initialActiveTabPlayed) {
-            player.volume = 1;
-            setHasPlayedOnce((prev) => ({ ...prev, [key]: true }));
-            setIsPermanentlyZoomed((prev) => ({ ...prev, [key]: true }));
-            RNAnimated.timing(videoScaleValues[key], {
-              toValue: 1.1,
-              duration: 300,
-              useNativeDriver: false,
-            }).start();
-            initialActiveTabPlayed = true;
+              setHasPlayedOnce((prev) => ({ ...prev, [key]: true }));
+              setIsPermanentlyZoomed((prev) => ({ ...prev, [key]: true }));
+              RNAnimated.timing(videoScaleValues[key], {
+                toValue: 1.1,
+                duration: 300,
+                useNativeDriver: false,
+              }).start();
+              initialActiveTabPlayed = true;
+            }
+          } catch (error) {
+            console.error(`iOS initial playback error for ${key}:`, error);
+            // Optionally reset player volume or state here if needed after an error
+            if (player) {
+              player.volume = 1; // Reset volume
+            }
           }
         }
       });
     }
-  }, [isIOS, isInitialLoad, activeTab]); // Removed videoScaleValues from dependencies as it's a ref and doesn't change
+  }, [isIOS, isInitialLoad, activeTab, videoScaleValues]);
 
   // Initial underline position and fade-in
   useEffect(() => {

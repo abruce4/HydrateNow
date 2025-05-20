@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Pressable, Platform, Dimensions, Animated as RNAnimated } from 'react-native';
-import { VideoView, useVideoPlayer, VideoPlayer, VideoPlayerStatus } from 'expo-video';
+import { StyleSheet, View, Text, Pressable, Platform, Animated as RNAnimated } from 'react-native';
+import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
 
 interface NavItem {

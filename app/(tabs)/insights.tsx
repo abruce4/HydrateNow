@@ -9,7 +9,7 @@ export default function InsightsScreen() {
       <ThemedText style={styles.title}>Insights</ThemedText>
       <View style={styles.separator} />
       <ThemedText style={styles.text}>
-        View your hydration trends and streaks over time.
+        View insights about your hydration habits
       </ThemedText>
     </ThemedView>
   );
@@ -25,6 +25,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 20,
   },
   separator: {
     marginVertical: 20,

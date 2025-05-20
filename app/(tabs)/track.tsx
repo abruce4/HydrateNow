@@ -9,7 +9,7 @@ export default function TrackScreen() {
       <ThemedText style={styles.title}>Track</ThemedText>
       <View style={styles.separator} />
       <ThemedText style={styles.text}>
-        Log your water intake to stay hydrated throughout the day.
+        Track your water intake here
       </ThemedText>
     </ThemedView>
   );
@@ -25,6 +25,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 20,
   },
   separator: {
     marginVertical: 20,

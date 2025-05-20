@@ -9,7 +9,7 @@ export default function RemindScreen() {
       <ThemedText style={styles.title}>Remind</ThemedText>
       <View style={styles.separator} />
       <ThemedText style={styles.text}>
-        Set up reminders to help you stay on track with your hydration goals.
+        Set reminders to drink water throughout the day
       </ThemedText>
     </ThemedView>
   );
@@ -25,6 +25,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 20,
   },
   separator: {
     marginVertical: 20,

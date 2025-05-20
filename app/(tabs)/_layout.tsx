@@ -3,6 +3,11 @@ import { StyleSheet, View, Text, Pressable, Platform, Animated as RNAnimated } f
 import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
 
+// Import the screen components
+import TrackScreen from './track';
+import RemindScreen from './remind';
+import InsightsScreen from './insights';
+
 interface NavItem {
   label: string
   isNew?: boolean
@@ -79,32 +84,41 @@ export default function MobileNav() {
       Object.keys(videoPlayersRef.current).forEach((key) => {
         const player = videoPlayersRef.current[key];
         if (player) {
-          player.volume = 0.01; // Keep low volume for this process
-          player.play(); // play() is void, no promise returned
+          try {
+            player.volume = 0.01; // Keep low volume for this process
+            player.play(); // play() is void, no promise returned
 
-          // Directly manage state after attempting to play
-          // This simplified logic might need further refinement based on actual behavior without promises
-          if (key !== activeTab || initialActiveTabPlayed) {
-            setTimeout(() => {
-              player.pause();
-              player.currentTime = 0;
+            // Directly manage state after attempting to play
+            if (key !== activeTab || initialActiveTabPlayed) {
+              setTimeout(() => {
+                if (videoPlayersRef.current[key]) { // Re-check player in timeout
+                  videoPlayersRef.current[key]!.pause();
+                  videoPlayersRef.current[key]!.currentTime = 0;
+                  videoPlayersRef.current[key]!.volume = 1;
+                }
+              }, 50);
+            } else if (key === activeTab && !initialActiveTabPlayed) {
               player.volume = 1;
-            }, 50);
-          } else if (key === activeTab && !initialActiveTabPlayed) {
-            player.volume = 1;
-            setHasPlayedOnce((prev) => ({ ...prev, [key]: true }));
-            setIsPermanentlyZoomed((prev) => ({ ...prev, [key]: true }));
-            RNAnimated.timing(videoScaleValues[key], {
-              toValue: 1.1,
-              duration: 300,
-              useNativeDriver: false,
-            }).start();
-            initialActiveTabPlayed = true;
+              setHasPlayedOnce((prev) => ({ ...prev, [key]: true }));
+              setIsPermanentlyZoomed((prev) => ({ ...prev, [key]: true }));
+              RNAnimated.timing(videoScaleValues[key], {
+                toValue: 1.1,
+                duration: 300,
+                useNativeDriver: false,
+              }).start();
+              initialActiveTabPlayed = true;
+            }
+          } catch (error) {
+            console.error(`iOS initial playback error for ${key}:`, error);
+            // Optionally reset player volume or state here if needed after an error
+            if (player) {
+              player.volume = 1; // Reset volume
+            }
           }
         }
       });
     }
-  }, [isIOS, isInitialLoad, activeTab]); // Removed videoScaleValues from dependencies as it's a ref and doesn't change
+  }, [isIOS, isInitialLoad, activeTab, videoScaleValues]);
 
   // Initial underline position and fade-in
   useEffect(() => {
@@ -228,6 +242,20 @@ export default function MobileNav() {
     setTabLayouts(prev => ({ ...prev, [label]: { x, width } }))
   }
 
+  // Helper function to render the active screen
+  const renderActiveScreen = () => {
+    if (activeTab === "Track") {
+      return <TrackScreen />;
+    }
+    if (activeTab === "Remind") {
+      return <RemindScreen />;
+    }
+    if (activeTab === "Insights") {
+      return <InsightsScreen />;
+    }
+    return null; // Or a default screen
+  };
+
   return (
     <View style={styles.outerContainer}>
       <View style={styles.navWrapper}>
@@ -288,6 +316,11 @@ export default function MobileNav() {
           )}
         </View>
       </View>
+
+      {/* Render the active screen content below the navigator */}
+      <View style={styles.contentContainer}>
+        {renderActiveScreen()}
+      </View>
     </View>
   )
 }
@@ -318,42 +351,30 @@ const VideoViewWithPlayer = ({ player, itemLabel }: { player: VideoPlayer; itemL
 
 const styles = StyleSheet.create({
   outerContainer: {
-    width: '100%',
-    // Applying shadow:
-    ...Platform.select({
-      ios: {
-        shadowColor: 'rgba(0, 0, 0, 0.05)',
-        shadowOffset: { width: 0, height: 10 }, // Roughly equivalent to the larger shadow
-        shadowOpacity: 1,
-        shadowRadius: 12.5, // Roughly equivalent to blur
-      },
-      android: {
-        elevation: 5, // Adjust elevation for desired shadow effect
-      },
-    }),
-    backgroundColor: '#fff', // Shadow needs a background color to be visible on Android
+    flex: 1,
+    backgroundColor: '#FFF', // Changed from '#000' to white
   },
-  navWrapper: { // Simulates max-w-md and mx-auto
-    width: '100%',
-    maxWidth: 448, // Tailwind 'md' breakpoint is often 768px, but for a nav, 'max-w-md' (28rem = 448px) might be intended. Adjust as needed.
-    alignSelf: 'center',
+  navWrapper: {
+    paddingTop: 30, // Added padding to move the navbar down
+    // Adjust styles as needed, ensure it doesn't overlap content if positioned absolutely
+    // backgroundColor: 'rgba(10, 25, 47, 0.0)', // Example: Semi-transparent dark blue
+    paddingBottom: 0, // Add padding if content is meant to be offset by the nav
+    zIndex: 10, // Ensure nav is above content if they overlap
   },
-  navContainer: { // Formerly 'nav' element
-    flexDirection: 'row', // To align children (navItemsContainer and underline)
-    justifyContent: 'center',
-    alignItems: 'flex-end', // To align items to bottom before considering underline
-    paddingHorizontal: 16, // px-4
-    paddingVertical: 6,   // py-1.5
-    position: 'relative',   // For underline positioning
-  },
-  navItemsContainer: { // Formerly the div with gap-16
+  navContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around', // This will distribute items, adjust if fixed gap is needed
-    alignItems: 'flex-end',
-    width: '100%', // Ensure it takes full width to space items
-    // If 'gap-16' (64px) was a strict requirement, you'd apply margin to children
-    // e.g. each Pressable (navItemBase) could have marginHorizontal: 32 / 2 = 16 if 3 items
-    // but space-around is often preferred for dynamic tab counts.
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 0, // Removed paddingVertical
+    backgroundColor: 'rgba(0, 0, 0, 0.0)', // Transparent background
+    borderTopWidth: 0, // Removed top border
+    // borderTopColor: 'rgba(255, 255, 255, 0.1)', // Example border color
+  },
+  navItemsContainer: {
+    flexDirection: 'row',
+    flex: 1,
+    justifyContent: 'space-around', // This will space out your items
+    paddingHorizontal: 0, // Add some horizontal padding if needed
   },
   navItemBase: {
     // flex: 1, // If you want items to grow and fill space, uncomment. May affect space-around.
@@ -390,23 +411,26 @@ const styles = StyleSheet.create({
   },
   labelText: {
     fontSize: 12,
-    color: '#000', // Default text color
+    color: '#000', // Default text color (black, good for white background)
   },
   labelTextActive: {
     fontWeight: '600',
-    color: '#000', // Active text color (can be different)
+    color: '#000', // Active text color (black, good for white background)
   },
   labelTextInactive: {
     fontWeight: '400',
-    color: '#333', // Inactive text color (can be different)
+    color: '#333', // Inactive text color (dark grey, good for white background)
   },
   underline: {
+    height: 2,
+    backgroundColor: '#1E90FF', // A distinct color for the underline
     position: 'absolute',
-    bottom: 0,
-    height: 2, // Made it a bit thicker for visibility
-    backgroundColor: 'black',
-    borderTopLeftRadius: 2, // React Native uses number for radius
-    borderTopRightRadius: 2,
+    bottom: 0, // Position underline at the bottom of the nav container
+  },
+  // Style for the container that will hold the screen content
+  contentContainer: {
+    flex: 1, // This will make the content area take up the remaining space
+    // Add any other styling you need for the content area
   },
 })
 

@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -25,21 +25,35 @@ const CARD_SHADOW = {
   shadowRadius: 4,
 };
 
+interface Reminder {
+  id: string;
+  timeLabel: string;
+  hour: number;
+  minute: number;
+  enabled: boolean;
+}
+
+const initialReminders: Reminder[] = [
+  { id: '8am', timeLabel: '08:00', hour: 8, minute: 0, enabled: false },
+  { id: '11am', timeLabel: '11:00', hour: 11, minute: 0, enabled: false },
+  { id: '2pm', timeLabel: '14:00', hour: 14, minute: 0, enabled: false },
+  { id: '5pm', timeLabel: '17:00', hour: 17, minute: 0, enabled: false },
+  { id: '8pm', timeLabel: '20:00', hour: 20, minute: 0, enabled: false },
+];
+
 export default function RemindScreen() {
-  const [is9amEnabled, setIs9amEnabled] = useState(false);
-  const [is1pmEnabled, setIs1pmEnabled] = useState(false);
-  const [is5pmEnabled, setIs5pmEnabled] = useState(false);
+  const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
 
   useEffect(() => {
-    // Load saved preferences
     const loadPreferences = async () => {
       try {
-        const nineAm = await AsyncStorage.getItem('9amReminder');
-        setIs9amEnabled(nineAm === 'true');
-        const onePm = await AsyncStorage.getItem('1pmReminder');
-        setIs1pmEnabled(onePm === 'true');
-        const fivePm = await AsyncStorage.getItem('5pmReminder');
-        setIs5pmEnabled(fivePm === 'true');
+        const updatedReminders = await Promise.all(
+          initialReminders.map(async (reminder) => {
+            const storedValue = await AsyncStorage.getItem(`reminder_${reminder.id}`);
+            return { ...reminder, enabled: storedValue === 'true' };
+          })
+        );
+        setReminders(updatedReminders);
       } catch (e) {
         console.error('Failed to load preferences.', e);
       }
@@ -60,6 +74,7 @@ export default function RemindScreen() {
   };
 
   const scheduleNotification = async (hour: number, minute: number, enabled: boolean, id: string) => {
+    const notificationId = `reminder_${id}`;
     if (enabled) {
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -71,33 +86,27 @@ export default function RemindScreen() {
           minute: minute,
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
         },
-        identifier: id,
+        identifier: notificationId,
       });
-      console.log(`Notification ${id} scheduled for ${hour}:${minute}`);
+      console.log(`Notification ${notificationId} scheduled for ${hour}:${minute}`);
     } else {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      console.log(`Notification ${id} cancelled`);
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      console.log(`Notification ${notificationId} cancelled`);
     }
   };
 
-  const toggleSwitch = async (time: string, value: boolean) => {
+  const toggleSwitch = async (reminderId: string, value: boolean) => {
     try {
-      await AsyncStorage.setItem(`${time}Reminder`, value.toString());
-      let hour = 0;
-      const minute = 0;
-      const id = `${time}Reminder`;
+      const updatedReminders = reminders.map((r) =>
+        r.id === reminderId ? { ...r, enabled: value } : r
+      );
+      setReminders(updatedReminders);
+      await AsyncStorage.setItem(`reminder_${reminderId}`, value.toString());
 
-      if (time === '9am') {
-        setIs9amEnabled(value);
-        hour = 9;
-      } else if (time === '1pm') {
-        setIs1pmEnabled(value);
-        hour = 13;
-      } else if (time === '5pm') {
-        setIs5pmEnabled(value);
-        hour = 17;
+      const reminderToUpdate = updatedReminders.find(r => r.id === reminderId);
+      if (reminderToUpdate) {
+        await scheduleNotification(reminderToUpdate.hour, reminderToUpdate.minute, value, reminderToUpdate.id);
       }
-      await scheduleNotification(hour, minute, value, id);
     } catch (e) {
       console.error('Failed to save preference or schedule notification.', e);
     }
@@ -105,54 +114,29 @@ export default function RemindScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText style={styles.screenTitle}>Reminder Settings</ThemedText>
+      <ThemedText style={styles.screenTitle}>Hydration Reminders</ThemedText>
+      <ThemedText style={styles.subtitle}>Stay on track with timely alerts</ThemedText>
 
       <View style={styles.card}>
-        <ThemedText style={styles.cardTitle}>Preset Daily Reminders</ThemedText>
-        <View style={styles.reminderRow}>
-          <MaterialCommunityIcons name="clock-time-nine-outline" size={26} color="#555" style={styles.reminderIcon} />
-          <ThemedText style={styles.reminderText}>9:00 AM</ThemedText>
-          <Switch
-            trackColor={{ false: '#d1d5db', true: '#60a5fa' }}
-            thumbColor={is9amEnabled ? '#3b82f6' : '#f4f3f4'}
-            ios_backgroundColor="#e5e7eb"
-            onValueChange={(value) => toggleSwitch('9am', value)}
-            value={is9amEnabled}
-          />
-        </View>
-
-        <View style={styles.reminderRow}>
-          <MaterialCommunityIcons name="clock-time-one-outline" size={26} color="#555" style={styles.reminderIcon} />
-          <ThemedText style={styles.reminderText}>1:00 PM</ThemedText>
-          <Switch
-            trackColor={{ false: '#d1d5db', true: '#60a5fa' }}
-            thumbColor={is1pmEnabled ? '#3b82f6' : '#f4f3f4'}
-            ios_backgroundColor="#e5e7eb"
-            onValueChange={(value) => toggleSwitch('1pm', value)}
-            value={is1pmEnabled}
-          />
-        </View>
-
-        <View style={styles.reminderRow}>
-          <MaterialCommunityIcons name="clock-time-five-outline" size={26} color="#555" style={styles.reminderIcon} />
-          <ThemedText style={styles.reminderText}>5:00 PM</ThemedText>
-          <Switch
-            trackColor={{ false: '#d1d5db', true: '#60a5fa' }}
-            thumbColor={is5pmEnabled ? '#3b82f6' : '#f4f3f4'}
-            ios_backgroundColor="#e5e7eb"
-            onValueChange={(value) => toggleSwitch('5pm', value)}
-            value={is5pmEnabled}
-          />
-        </View>
+        {reminders.map((reminder) => (
+          <View key={reminder.id} style={styles.reminderRow}>
+            <Ionicons 
+              name={reminder.enabled ? "notifications" : "notifications-outline"} 
+              size={26} 
+              color={reminder.enabled ? "#3b82f6" : "#9ca3af"} // Blue if enabled, gray if not
+              style={styles.reminderIcon} 
+            />
+            <ThemedText style={styles.reminderText}>{reminder.timeLabel}</ThemedText>
+            <Switch
+              trackColor={{ false: '#d1d5db', true: '#60a5fa' }}
+              thumbColor={reminder.enabled ? '#3b82f6' : '#f4f3f4'}
+              ios_backgroundColor="#e5e7eb"
+              onValueChange={(newValue) => toggleSwitch(reminder.id, newValue)}
+              value={reminder.enabled}
+            />
+          </View>
+        ))}
       </View>
-
-      <TouchableOpacity 
-        style={styles.actionButton} 
-        onPress={() => alert('Custom Reminders are a premium feature!')}
-      >
-        <Ionicons name="add-circle-outline" size={28} color="#fff" />
-        <Text style={styles.actionButtonText}>Custom Reminders (Premium)</Text>
-      </TouchableOpacity>
     </ThemedView>
   );
 }
@@ -161,16 +145,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    // justifyContent: 'flex-start', // Align items to the start
     paddingHorizontal: 15,
-    paddingTop: 60, // Match track.tsx
-    backgroundColor: '#f3f4f6', // Match track.tsx
+    paddingTop: 60,
+    backgroundColor: '#f3f4f6',
   },
   screenTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 25,
+    marginBottom: 4,
     color: '#1f2937',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   card: {
     backgroundColor: '#ffffff',
@@ -180,13 +170,6 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 25,
     ...CARD_SHADOW,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 20,
-    textAlign: 'center',
   },
   reminderRow: {
     flexDirection: 'row',
@@ -203,31 +186,6 @@ const styles = StyleSheet.create({
   reminderText: {
     fontSize: 18,
     color: '#374151',
-    flex: 1, // Allow text to take available space
+    flex: 1,
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3b82f6', // Main action color from track.tsx
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderRadius: 15,
-    width: '100%', // Make button full width similar to track.tsx
-    ...CARD_SHADOW,
-    marginTop: 10, // Add some margin on top
-  },
-  actionButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
-  // Separator is no longer used with card layout
-  // separator: {
-  //   marginVertical: 30,
-  //   height: 1,
-  //   width: '80%',
-  //   backgroundColor: '#e5e7eb',
-  // },
 }); 

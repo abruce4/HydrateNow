@@ -15,7 +15,7 @@ const CARD_SHADOW = {
 };
 
 export default function TrackScreen() {
-  const { currentIntake, dailyGoal, addIntake, setDailyGoal } = useHydrationStore();
+  const { currentIntake, dailyGoal, addIntake, setDailyGoal, resetIntake } = useHydrationStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
 
@@ -56,7 +56,8 @@ export default function TrackScreen() {
           />
         </Svg>
         <View style={styles.progressTextContainer}>
-          <ThemedText style={[styles.progressText, { color: textColor }]}>{`${Math.round(clampedPercentage)}%`}</ThemedText>
+          <ThemedText style={[styles.progressAmountText, { color: textColor }]}>{`${currentIntake}ml`}</ThemedText>
+          <ThemedText style={[styles.progressPercentageText, { color: textColor }]}>{`${Math.round(clampedPercentage)}% of daily goal`}</ThemedText>
         </View>
       </View>
     );
@@ -77,16 +78,48 @@ export default function TrackScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <ThemedText style={styles.title}>Daily Hydration</ThemedText>
+      <ThemedText style={styles.subtitle}>Track your water intake</ThemedText>
+
       <View style={styles.card}>
         <CircularProgress percentage={percentage} />
       </View>
 
-      <View style={[styles.card, styles.intakeCard]}>
-        <MaterialCommunityIcons name="water-outline" size={32} color="#3b82f6" style={styles.intakeIcon} />
-        <ThemedText style={styles.intakeText}>
-          {currentIntake}ml / {dailyGoal}ml
-        </ThemedText>
+      <View style={styles.quickAddButtonsContainer}>
+        <TouchableOpacity style={styles.quickAddButton} onPress={() => handleAddIntake(250)}>
+          <ThemedText style={styles.quickAddButtonText}>+250ml</ThemedText>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickAddButton} onPress={() => handleAddIntake(500)}>
+          <ThemedText style={styles.quickAddButtonText}>+500ml</ThemedText>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickAddButton} onPress={() => setModalVisible(true)}>
+          <ThemedText style={styles.quickAddButtonText}>Custom</ThemedText>
+        </TouchableOpacity>
       </View>
+
+      <TouchableOpacity style={styles.addWaterButton} onPress={() => setModalVisible(true)}>
+        <Ionicons name="add" size={28} color="#fff" />
+        <ThemedText style={styles.addWaterButtonText}>Add Water</ThemedText>
+      </TouchableOpacity>
+
+      <View style={styles.infoContainer}>
+        <View style={styles.infoRow}>
+          <ThemedText style={styles.infoLabel}>Daily Goal</ThemedText>
+          <ThemedText style={styles.infoValue}>{dailyGoal}ml</ThemedText>
+        </View>
+        <View style={styles.infoRow}>
+          <ThemedText style={styles.infoLabel}>Consumed</ThemedText>
+          <ThemedText style={styles.infoValue}>{currentIntake}ml</ThemedText>
+        </View>
+        <View style={styles.infoRow}>
+          <ThemedText style={styles.infoLabel}>Remaining</ThemedText>
+          <ThemedText style={styles.infoValue}>{Math.max(0, dailyGoal - currentIntake)}ml</ThemedText>
+        </View>
+      </View>
+
+      <TouchableOpacity style={styles.resetButton} onPress={resetIntake}>
+        <ThemedText style={styles.resetButtonText}>Reset</ThemedText>
+      </TouchableOpacity>
 
       {isGoalReached && (
         <View style={styles.goalReachedMessageContainer}>
@@ -94,23 +127,6 @@ export default function TrackScreen() {
           <ThemedText style={styles.goalReachedText}>Daily goal achieved! Keep it up!</ThemedText>
         </View>
       )}
-
-      <View style={[styles.card, styles.actionsCard]}>
-        <View style={styles.buttonsVerticalContainer}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => handleAddIntake(250)}>
-            <Ionicons name="add-circle-outline" size={28} color="#fff" />
-            <ThemedText style={styles.actionButtonText}>Add 250ml</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => handleAddIntake(500)}>
-            <Ionicons name="add-circle-sharp" size={28} color="#fff" />
-            <ThemedText style={styles.actionButtonText}>Add 500ml</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.customEntryButton]} onPress={() => setModalVisible(true)}>
-            <MaterialCommunityIcons name="cup-water" size={28} color="#fff" />
-            <ThemedText style={styles.actionButtonText}>Custom Entry</ThemedText>
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <Modal
         animationType="slide"
@@ -148,11 +164,6 @@ export default function TrackScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* <View style={styles.separator} />
-      <ThemedText style={styles.text}>
-        Track your water intake here
-      </ThemedText> */}
     </ThemedView>
   );
 }
@@ -184,9 +195,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  progressText: {
-    fontSize: 30,
+  progressAmountText: {
+    fontSize: 36,
     fontWeight: 'bold',
+  },
+  progressPercentageText: {
+    fontSize: 14,
+    color: '#6b7280',
   },
   intakeCard: {
     flexDirection: 'row',
@@ -331,5 +346,97 @@ const styles = StyleSheet.create({
     height: 1,
     width: '80%',
     backgroundColor: '#e5e7eb',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  quickAddButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 20,
+  },
+  quickAddButton: {
+    backgroundColor: '#e0e7ff',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    marginHorizontal: 5,
+    ...CARD_SHADOW,
+  },
+  quickAddButtonText: {
+    color: '#3b82f6',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  addWaterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3b82f6',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 15,
+    width: '100%',
+    marginBottom: 20,
+    ...CARD_SHADOW,
+  },
+  addWaterButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+  infoContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 20,
+    width: '100%',
+    marginBottom: 20,
+    ...CARD_SHADOW,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  infoLabel: {
+    fontSize: 16,
+    color: '#4b5563',
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  resetButton: {
+    backgroundColor: '#e5e7eb',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 20,
+    ...CARD_SHADOW,
+  },
+  resetButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

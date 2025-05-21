@@ -5,9 +5,11 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 interface HydrationState {
   dailyGoal: number;
   currentIntake: number;
+  onboardingCompleted: boolean;
   addIntake: (amount: number) => void;
   setDailyGoal: (goal: number) => void;
   resetIntake: () => void;
+  setOnboardingCompleted: (completed: boolean) => void;
 }
 
 const useHydrationStore = create<HydrationState>()(
@@ -15,6 +17,7 @@ const useHydrationStore = create<HydrationState>()(
     (set) => ({
       dailyGoal: 2000, // Default daily goal in ml
       currentIntake: 0,
+      onboardingCompleted: false,
       addIntake: (amount) =>
         set((state) => {
           const newIntake = state.currentIntake + amount;
@@ -22,6 +25,7 @@ const useHydrationStore = create<HydrationState>()(
         }),
       setDailyGoal: (goal) => set({ dailyGoal: goal > 0 ? goal : 2000 }),
       resetIntake: () => set({ currentIntake: 0 }),
+      setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
     }),
     {
       name: 'hydration-storage', // unique name

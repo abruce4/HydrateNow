@@ -41,11 +41,11 @@ interface Reminder {
 }
 
 const initialReminders: Reminder[] = [
-  { id: '8am', timeLabel: '08:00', hour: 8, minute: 0, enabled: false },
-  { id: '11am', timeLabel: '11:00', hour: 11, minute: 0, enabled: false },
-  { id: '2pm', timeLabel: '14:00', hour: 14, minute: 0, enabled: false },
-  { id: '5pm', timeLabel: '17:00', hour: 17, minute: 0, enabled: false },
-  { id: '8pm', timeLabel: '20:00', hour: 20, minute: 0, enabled: false },
+  { id: '8am', timeLabel: '08:00 AM', hour: 8, minute: 0, enabled: false },
+  { id: '11am', timeLabel: '11:00 AM', hour: 11, minute: 0, enabled: false },
+  { id: '2pm', timeLabel: '02:00 PM', hour: 14, minute: 0, enabled: false },
+  { id: '5pm', timeLabel: '05:00 PM', hour: 17, minute: 0, enabled: false },
+  { id: '8pm', timeLabel: '08:00 PM', hour: 20, minute: 0, enabled: false },
 ];
 
 // Create a notification category for interactive notifications
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   screenTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 4,
     color: '#1f2937',

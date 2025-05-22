@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Modal, TextInput, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import useHydrationStore from '@/stores/hydrationStore';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
 
 const CARD_SHADOW = {
   elevation: 4,
@@ -78,55 +79,55 @@ export default function TrackScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText style={styles.title}>Daily Hydration</ThemedText>
-      <ThemedText style={styles.subtitle}>Track your water intake</ThemedText>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
+        <ThemedText style={styles.title}>Daily Hydration</ThemedText>
+        <ThemedText style={styles.subtitle}>Track your water intake</ThemedText>
 
-      <View style={styles.card}>
-        <CircularProgress percentage={percentage} />
-      </View>
+        <View style={styles.card}>
+          <CircularProgress percentage={percentage} />
+        </View>
 
-      <View style={styles.quickAddButtonsContainer}>
-        <TouchableOpacity style={styles.quickAddButton} onPress={() => handleAddIntake(250)}>
-          <ThemedText style={styles.quickAddButtonText}>+250ml</ThemedText>
+        <View style={styles.quickAddButtonsContainer}>
+          <TouchableOpacity style={styles.quickAddButton} onPress={() => handleAddIntake(250)}>
+            <ThemedText style={styles.quickAddButtonText}>+250ml</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickAddButton} onPress={() => handleAddIntake(500)}>
+            <ThemedText style={styles.quickAddButtonText}>+500ml</ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.addWaterButton} onPress={() => setModalVisible(true)}>
+          <Ionicons name="add" size={28} color="#fff" />
+          <ThemedText style={styles.addWaterButtonText}>Add Water</ThemedText>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickAddButton} onPress={() => handleAddIntake(500)}>
-          <ThemedText style={styles.quickAddButtonText}>+500ml</ThemedText>
+
+        <View style={styles.infoContainer}>
+          <View style={styles.infoRow}>
+            <ThemedText style={styles.infoLabel}>Daily Goal</ThemedText>
+            <ThemedText style={styles.infoValue}>{dailyGoal}ml</ThemedText>
+          </View>
+          <View style={styles.infoRow}>
+            <ThemedText style={styles.infoLabel}>Consumed</ThemedText>
+            <ThemedText style={styles.infoValue}>{currentIntake}ml</ThemedText>
+          </View>
+          <View style={styles.infoRow}>
+            <ThemedText style={styles.infoLabel}>Remaining</ThemedText>
+            <ThemedText style={styles.infoValue}>{Math.max(0, dailyGoal - currentIntake)}ml</ThemedText>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.resetButton} onPress={resetIntake}>
+          <ThemedText style={styles.resetButtonText}>Reset</ThemedText>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickAddButton} onPress={() => setModalVisible(true)}>
-          <ThemedText style={styles.quickAddButtonText}>Custom</ThemedText>
-        </TouchableOpacity>
-      </View>
 
-      <TouchableOpacity style={styles.addWaterButton} onPress={() => setModalVisible(true)}>
-        <Ionicons name="add" size={28} color="#fff" />
-        <ThemedText style={styles.addWaterButtonText}>Add Water</ThemedText>
-      </TouchableOpacity>
-
-      <View style={styles.infoContainer}>
-        <View style={styles.infoRow}>
-          <ThemedText style={styles.infoLabel}>Daily Goal</ThemedText>
-          <ThemedText style={styles.infoValue}>{dailyGoal}ml</ThemedText>
-        </View>
-        <View style={styles.infoRow}>
-          <ThemedText style={styles.infoLabel}>Consumed</ThemedText>
-          <ThemedText style={styles.infoValue}>{currentIntake}ml</ThemedText>
-        </View>
-        <View style={styles.infoRow}>
-          <ThemedText style={styles.infoLabel}>Remaining</ThemedText>
-          <ThemedText style={styles.infoValue}>{Math.max(0, dailyGoal - currentIntake)}ml</ThemedText>
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.resetButton} onPress={resetIntake}>
-        <ThemedText style={styles.resetButtonText}>Reset</ThemedText>
-      </TouchableOpacity>
-
-      {isGoalReached && (
-        <View style={styles.goalReachedMessageContainer}>
-          <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
-          <ThemedText style={styles.goalReachedText}>Daily goal achieved! Keep it up!</ThemedText>
-        </View>
-      )}
+        {isGoalReached && (
+          <View style={styles.goalReachedMessageContainer}>
+            <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
+            <ThemedText style={styles.goalReachedText}>Daily goal achieved! Keep it up!</ThemedText>
+          </View>
+        )}
+      </ScrollView>
 
       <Modal
         animationType="slide"
@@ -171,11 +172,16 @@ export default function TrackScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
+    backgroundColor: '#f3f4f6',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
     paddingHorizontal: 15,
     paddingTop: 60,
-    backgroundColor: '#f3f4f6',
+    paddingBottom: 30,
+    alignItems: 'center',
   },
   card: {
     backgroundColor: '#ffffff',
@@ -196,12 +202,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   progressAmountText: {
-    fontSize: 36,
+    fontSize: 24,
     fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   progressPercentageText: {
     fontSize: 14,
     color: '#6b7280',
+    textAlign: 'center',
   },
   intakeCard: {
     flexDirection: 'row',
@@ -348,7 +357,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1f2937',
     marginBottom: 4,

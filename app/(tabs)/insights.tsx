@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { BarChart, Grid } from 'react-native-svg-charts';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import useHydrationStore from '@/stores/hydrationStore';
+import { Stack } from 'expo-router';
 
 const CARD_SHADOW = {
   elevation: 4,
@@ -16,28 +17,49 @@ const CARD_SHADOW = {
 
 export default function InsightsScreen() {
   const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
-  const dailyGoal = 2500;
+  const { dailyGoal, getWeeklyData } = useHydrationStore();
 
-  const weeklyData = [
-    { value: 2200, label: 'Mon' },
-    { value: 2400, label: 'Tue' },
-    { value: 1800, label: 'Wed' },
-    { value: 2500, label: 'Thu' },
-    { value: 2000, label: 'Fri' },
-    { value: 2600, label: 'Sat' },
-    { value: 2300, label: 'Sun' },
-  ];
-
+  // Get weekly data from the store
+  const weeklyData = getWeeklyData();
+  
+  // Calculate statistics using actual data
   const chartData = weeklyData.map(item => item.value);
   const averageIntake = chartData.reduce((sum, val) => sum + val, 0) / chartData.length;
   const daysGoalReached = weeklyData.filter(day => day.value >= dailyGoal).length;
 
-  const improvingTrendPercentage = 12;
-  const bestDay = { day: 'Wednesday', intake: 2400 };
+  // Calculate if there's an improving trend
+  const calculateImprovingTrend = useMemo(() => {
+    // If we have less than 2 days of data, can't calculate trend
+    if (weeklyData.filter(d => d.value > 0).length < 2) {
+      return null;
+    }
+    
+    // Compare first half of week with second half
+    const firstHalf = weeklyData.slice(0, 3).reduce((sum, day) => sum + day.value, 0);
+    const secondHalf = weeklyData.slice(3).reduce((sum, day) => sum + day.value, 0);
+    
+    if (firstHalf === 0) return null; // Avoid division by zero
+    
+    const percentChange = Math.round(((secondHalf - firstHalf) / firstHalf) * 100);
+    return {
+      improving: percentChange > 0,
+      percentage: Math.abs(percentChange)
+    };
+  }, [weeklyData]);
+
+  // Find the best day
+  const bestDay = useMemo(() => {
+    const nonZeroDays = weeklyData.filter(day => day.value > 0);
+    if (nonZeroDays.length === 0) return null;
+    
+    return nonZeroDays.reduce((best, current) => 
+      current.value > best.value ? current : best, nonZeroDays[0]);
+  }, [weeklyData]);
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
         <ThemedText style={styles.title}>Hydration Insights</ThemedText>
         <ThemedText style={styles.subtitle}>Track your progress over time</ThemedText>
 
@@ -99,24 +121,58 @@ export default function InsightsScreen() {
 
             <View style={styles.insightsSectionCard}>
               <ThemedText style={styles.insightsTitle}>Insights</ThemedText>
-              <View style={styles.insightItem}>
-                <MaterialCommunityIcons name="trending-up" size={24} color="#16a34a" style={styles.insightIcon} />
-                <View style={styles.insightTextContainer}>
-                  <ThemedText style={styles.insightMainText}>Improving Trend</ThemedText>
-                  <ThemedText style={styles.insightSubText}>
-                    Your hydration has improved by {improvingTrendPercentage}% compared to last week.
-                  </ThemedText>
+              
+              {calculateImprovingTrend ? (
+                <View style={styles.insightItem}>
+                  <MaterialCommunityIcons 
+                    name={calculateImprovingTrend.improving ? "trending-up" : "trending-down"} 
+                    size={24} 
+                    color={calculateImprovingTrend.improving ? "#16a34a" : "#ef4444"} 
+                    style={styles.insightIcon} 
+                  />
+                  <View style={styles.insightTextContainer}>
+                    <ThemedText style={styles.insightMainText}>
+                      {calculateImprovingTrend.improving ? "Improving Trend" : "Declining Trend"}
+                    </ThemedText>
+                    <ThemedText style={styles.insightSubText}>
+                      Your hydration has {calculateImprovingTrend.improving ? "improved" : "decreased"} by {calculateImprovingTrend.percentage}% 
+                      from earlier this week.
+                    </ThemedText>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.insightItem}>
-                <Ionicons name="calendar-outline" size={24} color="#3b82f6" style={styles.insightIcon} />
-                <View style={styles.insightTextContainer}>
-                  <ThemedText style={styles.insightMainText}>Best Day</ThemedText>
-                  <ThemedText style={styles.insightSubText}>
-                    {bestDay.day} was your best hydration day with {bestDay.intake}ml.
-                  </ThemedText>
+              ) : (
+                <View style={styles.insightItem}>
+                  <MaterialCommunityIcons name="information-outline" size={24} color="#6b7280" style={styles.insightIcon} />
+                  <View style={styles.insightTextContainer}>
+                    <ThemedText style={styles.insightMainText}>Not Enough Data</ThemedText>
+                    <ThemedText style={styles.insightSubText}>
+                      Keep tracking your hydration to see trends and insights.
+                    </ThemedText>
+                  </View>
                 </View>
-              </View>
+              )}
+              
+              {bestDay ? (
+                <View style={styles.insightItem}>
+                  <Ionicons name="calendar-outline" size={24} color="#3b82f6" style={styles.insightIcon} />
+                  <View style={styles.insightTextContainer}>
+                    <ThemedText style={styles.insightMainText}>Best Day</ThemedText>
+                    <ThemedText style={styles.insightSubText}>
+                      {bestDay.label} was your best hydration day with {bestDay.value}ml.
+                    </ThemedText>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.insightItem}>
+                  <Ionicons name="calendar-outline" size={24} color="#6b7280" style={styles.insightIcon} />
+                  <View style={styles.insightTextContainer}>
+                    <ThemedText style={styles.insightMainText}>No Data Yet</ThemedText>
+                    <ThemedText style={styles.insightSubText}>
+                      Start tracking your hydration to see your best days.
+                    </ThemedText>
+                  </View>
+                </View>
+              )}
             </View>
           </>
         )}
@@ -137,14 +193,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
-  scrollContentContainer: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
     alignItems: 'center',
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingTop: 60,
+    paddingBottom: 30,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 20,
     marginBottom: 4,
     color: '#1f2937',
     textAlign: 'center',

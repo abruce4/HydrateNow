@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Switch, Platform, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, View, Switch, Platform, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import useHydrationStore from '@/stores/hydrationStore';
+import { Stack } from 'expo-router';
 
 // Configure notification handler with custom appearance
 Notifications.setNotificationHandler({
@@ -233,42 +234,45 @@ export default function RemindScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText style={styles.screenTitle}>Hydration Reminders</ThemedText>
-      <ThemedText style={styles.subtitle}>Stay on track with timely alerts</ThemedText>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
+        <ThemedText style={styles.title}>Hydration Reminders</ThemedText>
+        <ThemedText style={styles.subtitle}>Stay on track with timely alerts</ThemedText>
 
-      <View style={styles.card}>
-        {reminders.map((reminder) => (
-          <View key={reminder.id} style={styles.reminderRow}>
-            <Ionicons 
-              name={reminder.enabled ? "notifications" : "notifications-outline"} 
-              size={26} 
-              color={reminder.enabled ? "#3b82f6" : "#9ca3af"} // Blue if enabled, gray if not
-              style={styles.reminderIcon} 
-            />
-            <ThemedText style={styles.reminderText}>{reminder.timeLabel}</ThemedText>
-            <Switch
-              trackColor={{ false: '#d1d5db', true: '#60a5fa' }}
-              thumbColor={reminder.enabled ? '#3b82f6' : '#f4f3f4'}
-              ios_backgroundColor="#e5e7eb"
-              onValueChange={(newValue) => toggleSwitch(reminder.id, newValue)}
-              value={reminder.enabled}
-            />
-          </View>
-        ))}
-      </View>
-      
-      <View style={styles.testButtonContainer}>
-        <TouchableOpacity 
-          style={styles.testButton}
-          onPress={sendTestNotification}
-          disabled={isSending}
-        >
-          <Ionicons name="notifications" size={24} color="#ffffff" style={styles.buttonIcon} />
-          <ThemedText style={styles.testButtonText}>
-            {isSending ? "Sending..." : "Send Test Notification"}
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.card}>
+          {reminders.map((reminder) => (
+            <View key={reminder.id} style={styles.reminderRow}>
+              <Ionicons 
+                name={reminder.enabled ? "notifications" : "notifications-outline"} 
+                size={26} 
+                color={reminder.enabled ? "#3b82f6" : "#9ca3af"} // Blue if enabled, gray if not
+                style={styles.reminderIcon} 
+              />
+              <ThemedText style={styles.reminderText}>{reminder.timeLabel}</ThemedText>
+              <Switch
+                trackColor={{ false: '#d1d5db', true: '#60a5fa' }}
+                thumbColor={reminder.enabled ? '#3b82f6' : '#f4f3f4'}
+                ios_backgroundColor="#e5e7eb"
+                onValueChange={(newValue) => toggleSwitch(reminder.id, newValue)}
+                value={reminder.enabled}
+              />
+            </View>
+          ))}
+        </View>
+        
+        <View style={styles.testButtonContainer}>
+          <TouchableOpacity 
+            style={styles.testButton}
+            onPress={sendTestNotification}
+            disabled={isSending}
+          >
+            <Ionicons name="notifications" size={24} color="#ffffff" style={styles.buttonIcon} />
+            <ThemedText style={styles.testButtonText}>
+              {isSending ? "Sending..." : "Send Test Notification"}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -276,12 +280,18 @@ export default function RemindScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingTop: 60,
     backgroundColor: '#f3f4f6',
   },
-  screenTitle: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    paddingHorizontal: 15,
+    paddingTop: 60,
+    paddingBottom: 30,
+    alignItems: 'center',
+  },
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 4,
@@ -322,7 +332,6 @@ const styles = StyleSheet.create({
   },
   testButtonContainer: {
     width: '100%',
-    paddingHorizontal: 15,
     marginTop: 10,
   },
   testButton: {

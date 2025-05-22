@@ -5,6 +5,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { BarChart, Grid } from 'react-native-svg-charts';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import useHydrationStore from '@/stores/hydrationStore';
+import { Stack } from 'expo-router';
 
 const CARD_SHADOW = {
   elevation: 4,
@@ -57,7 +58,8 @@ export default function InsightsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
         <ThemedText style={styles.title}>Hydration Insights</ThemedText>
         <ThemedText style={styles.subtitle}>Track your progress over time</ThemedText>
 
@@ -191,14 +193,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
-  scrollContentContainer: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
     alignItems: 'center',
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingTop: 60,
+    paddingBottom: 30,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 20,
     marginBottom: 4,
     color: '#1f2937',
     textAlign: 'center',

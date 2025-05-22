@@ -22,7 +22,6 @@ Notifications.setNotificationHandler({
       shouldSetBadge: false,
       shouldShowBanner: true,
       shouldShowList: true,
-      // New iOS options will be used in the presentation
     };
   },
 });
@@ -45,11 +44,11 @@ interface Reminder {
 }
 
 const initialReminders: Reminder[] = [
-  { id: '8am', timeLabel: '08:00 AM', hour: 8, minute: 0, enabled: false },
-  { id: '11am', timeLabel: '11:00 AM', hour: 11, minute: 0, enabled: false },
-  { id: '2pm', timeLabel: '02:00 PM', hour: 14, minute: 0, enabled: false },
-  { id: '5pm', timeLabel: '05:00 PM', hour: 17, minute: 0, enabled: false },
-  { id: '8pm', timeLabel: '08:00 PM', hour: 20, minute: 0, enabled: false },
+  { id: '8am', timeLabel: '08:00 AM', hour: 8, minute: 0, enabled: false, isCustom: false },
+  { id: '11am', timeLabel: '11:00 AM', hour: 11, minute: 0, enabled: false, isCustom: false },
+  { id: '2pm', timeLabel: '02:00 PM', hour: 14, minute: 0, enabled: false, isCustom: false },
+  { id: '5pm', timeLabel: '05:00 PM', hour: 17, minute: 0, enabled: false, isCustom: false },
+  { id: '8pm', timeLabel: '08:00 PM', hour: 20, minute: 0, enabled: false, isCustom: false },
 ];
 
 // Create a notification category for interactive notifications
@@ -85,32 +84,46 @@ const formatTime = (hour: number, minute: number): string => {
 };
 
 export default function RemindScreen() {
-  const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
-  const { dailyGoal, currentIntake, addIntake } = useHydrationStore();
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const { addIntake } = useHydrationStore();
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [selectedTime, setSelectedTime] = useState(new Date());
 
   useEffect(() => {
     const loadPreferences = async () => {
       try {
-        const updatedReminders = await Promise.all(
+        // Process initialReminders to check their stored 'enabled' state
+        const processedInitialReminders = await Promise.all(
           initialReminders.map(async (reminder) => {
             const storedValue = await AsyncStorage.getItem(`reminder_${reminder.id}`);
-            return { ...reminder, enabled: storedValue === 'true' };
+            // If storedValue is null (e.g., after deletion), it will be disabled
+            return { ...reminder, enabled: storedValue === 'true' }; 
           })
         );
-        setReminders(updatedReminders);
-        
+
         // Load custom reminders
         const customRemindersJson = await AsyncStorage.getItem('custom_reminders');
+        let loadedCustomReminders: Reminder[] = [];
         if (customRemindersJson) {
-          const customReminders = JSON.parse(customRemindersJson);
-          // Mark custom reminders
-          const markedCustomReminders = customReminders.map((r: Reminder) => ({...r, isCustom: true}));
-          setReminders(prev => [...prev, ...markedCustomReminders]);
+          loadedCustomReminders = JSON.parse(customRemindersJson).map((r: Reminder) => ({...r, isCustom: true}));
         }
+        
+        // Combine and set reminders, ensuring custom reminders override defaults if IDs clash (though unlikely)
+        const combinedReminders = [...processedInitialReminders];
+        loadedCustomReminders.forEach(customReminder => {
+          const index = combinedReminders.findIndex(r => r.id === customReminder.id);
+          if (index !== -1) {
+            combinedReminders[index] = customReminder; // Replace if ID exists (e.g. custom was somehow saved with default ID)
+          } else {
+            combinedReminders.push(customReminder);
+          }
+        });
+
+        setReminders(combinedReminders);
+
       } catch (e) {
         console.error('Failed to load preferences.', e);
+        setReminders(initialReminders); // Fallback to initialReminders if loading fails
       }
     };
     
@@ -118,14 +131,11 @@ export default function RemindScreen() {
     requestPermissions();
     setupNotificationCategories();
     
-    // Set up notification response listener
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
       if (response.actionIdentifier === 'done') {
-        // User marked as done, add a glass of water (250ml)
         addIntake(250);
         Alert.alert('Great job!', '250ml of water added to your daily intake.');
       } else if (response.actionIdentifier === 'remind_later') {
-        // Schedule a reminder for 30 minutes later
         scheduleReminderNotification(30);
       }
     });
@@ -133,7 +143,7 @@ export default function RemindScreen() {
     return () => {
       responseListener.remove();
     };
-  }, []);
+  }, [addIntake]);
 
   const requestPermissions = async () => {
     if (Platform.OS === 'android') {
@@ -177,14 +187,11 @@ export default function RemindScreen() {
     const notificationId = `reminder_${id}`;
     
     if (enabled) {
-      const { dailyGoal, currentIntake } = useHydrationStore.getState();
-      const percentage = Math.min(Math.round((currentIntake / dailyGoal) * 100), 100);
-      
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "Stay Hydrated!",
           body: "Drink 1 glass of water",
-          data: { percentage },
+          data: { id }, // Pass reminder ID for potential interactions
           categoryIdentifier: 'hydration_reminder',
           sound: 'default',
         },
@@ -216,9 +223,8 @@ export default function RemindScreen() {
         await scheduleNotification(reminderToUpdate.hour, reminderToUpdate.minute, value, reminderToUpdate.id);
       }
       
-      // Update custom reminders in storage if this is a custom reminder
-      if (reminderId.startsWith('custom_')) {
-        const customReminders = updatedReminders.filter(r => r.id.startsWith('custom_'));
+      if (reminderToUpdate?.isCustom) {
+        const customReminders = updatedReminders.filter(r => r.isCustom);
         await AsyncStorage.setItem('custom_reminders', JSON.stringify(customReminders));
       }
     } catch (e) {
@@ -227,9 +233,8 @@ export default function RemindScreen() {
   };
   
   const handleConfirmDateTime = async (date: Date) => {
-    setDatePickerVisibility(false); // Hide modal first as per docs
+    setDatePickerVisibility(false);
     try {
-      // Use the selected time from state
       const hour = date.getHours();
       const minute = date.getMinutes();
       const timeLabel = formatTime(hour, minute);
@@ -244,20 +249,18 @@ export default function RemindScreen() {
         isCustom: true
       };
       
-      const updatedReminders = [...reminders, newReminder];
-      setReminders(updatedReminders);
+      // Add to current reminders state
+      const newRemindersList = [...reminders, newReminder];
+      setReminders(newRemindersList);
       
-      // Save to AsyncStorage
+      // Save its enabled state
       await AsyncStorage.setItem(`reminder_${id}`, 'true');
-      
-      // Schedule the notification
-      await scheduleNotification(hour, minute, true, id);
-      
-      // Update custom reminders in storage
-      const customReminders = updatedReminders.filter(r => r.id.startsWith('custom_'));
+      // Update the full list of custom reminders
+      const customReminders = newRemindersList.filter(r => r.isCustom);
       await AsyncStorage.setItem('custom_reminders', JSON.stringify(customReminders));
       
-      // Use setTimeout for Alert as per docs for iOS
+      await scheduleNotification(hour, minute, true, id);
+      
       setTimeout(() => Alert.alert('Success', `Reminder set for ${timeLabel}`), 0);
 
     } catch (e) {
@@ -271,31 +274,23 @@ export default function RemindScreen() {
   };
 
   const showDatePicker = () => {
-    setSelectedTime(new Date()); // Reset to current time or a default
+    setSelectedTime(new Date()); 
     setDatePickerVisibility(true);
   };
 
   const deleteReminder = async (reminderId: string) => {
     try {
-      // Can only delete custom reminders
-      if (!reminderId.startsWith('custom_')) {
-        Alert.alert('Notice', 'Default reminders cannot be deleted. You can turn them off instead.');
-        return;
-      }
-      
-      // Cancel any scheduled notifications
       await Notifications.cancelScheduledNotificationAsync(`reminder_${reminderId}`);
+      await AsyncStorage.removeItem(`reminder_${reminderId}`); // For both default and custom specific state
       
-      // Remove from AsyncStorage
-      await AsyncStorage.removeItem(`reminder_${reminderId}`);
-      
-      // Update state
       const updatedReminders = reminders.filter(r => r.id !== reminderId);
       setReminders(updatedReminders);
       
-      // Update custom reminders in storage
-      const customReminders = updatedReminders.filter(r => r.id.startsWith('custom_'));
-      await AsyncStorage.setItem('custom_reminders', JSON.stringify(customReminders));
+      // If it was a custom reminder, also update the list of custom reminders in storage
+      if (reminderId.startsWith('custom_')) {
+        const customReminders = updatedReminders.filter(r => r.isCustom);
+        await AsyncStorage.setItem('custom_reminders', JSON.stringify(customReminders));
+      }
       
       Alert.alert('Success', 'Reminder deleted');
     } catch (e) {
@@ -304,9 +299,8 @@ export default function RemindScreen() {
     }
   };
 
-  const renderRightActions = (reminderId: string, isCustom?: boolean) => {
-    if (!isCustom) return null;
-    
+  // renderRightActions no longer needs isCustom, delete is available for all
+  const renderRightActions = (reminderId: string) => {
     return (
       <TouchableOpacity 
         style={styles.deleteAction}
@@ -329,7 +323,7 @@ export default function RemindScreen() {
           {reminders.map((reminder) => (
             <Swipeable
               key={reminder.id}
-              renderRightActions={() => renderRightActions(reminder.id, reminder.isCustom)}
+              renderRightActions={() => renderRightActions(reminder.id)} // Pass only ID
               friction={2}
               rightThreshold={40}
             >
@@ -337,7 +331,7 @@ export default function RemindScreen() {
                 <Ionicons 
                   name={reminder.enabled ? "notifications" : "notifications-outline"} 
                   size={26} 
-                  color={reminder.enabled ? "#3b82f6" : "#9ca3af"} // Blue if enabled, gray if not
+                  color={reminder.enabled ? "#3b82f6" : "#9ca3af"}
                   style={styles.reminderIcon} 
                 />
                 <ThemedText style={styles.reminderText}>{reminder.timeLabel}</ThemedText>
@@ -374,6 +368,7 @@ export default function RemindScreen() {
         date={selectedTime}
         is24Hour={false}
       />
+
     </ThemedView>
   );
 }
@@ -432,7 +427,7 @@ const styles = StyleSheet.create({
     color: '#374151',
     flex: 1,
   },
-  addButtonContainer: {
+  addButtonContainer: { 
     width: '100%',
     marginTop: 10,
   },

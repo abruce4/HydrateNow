@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Switch, Platform, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { StyleSheet, View, Switch, Platform, TouchableOpacity, Alert, ScrollView, Text } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,6 +7,8 @@ import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import useHydrationStore from '@/stores/hydrationStore';
 import { Stack } from 'expo-router';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import { Swipeable } from 'react-native-gesture-handler';
 
 // Configure notification handler with custom appearance
 Notifications.setNotificationHandler({
@@ -39,6 +41,7 @@ interface Reminder {
   hour: number;
   minute: number;
   enabled: boolean;
+  isCustom?: boolean;
 }
 
 const initialReminders: Reminder[] = [
@@ -73,10 +76,19 @@ async function setupNotificationCategories() {
   ]);
 }
 
+// Helper function to format time
+const formatTime = (hour: number, minute: number): string => {
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
+  const formattedMinute = minute < 10 ? `0${minute}` : minute;
+  return `${formattedHour}:${formattedMinute} ${period}`;
+};
+
 export default function RemindScreen() {
   const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
   const { dailyGoal, currentIntake, addIntake } = useHydrationStore();
-  const [isSending, setIsSending] = useState(false);
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+  const [selectedTime, setSelectedTime] = useState(new Date());
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -88,6 +100,15 @@ export default function RemindScreen() {
           })
         );
         setReminders(updatedReminders);
+        
+        // Load custom reminders
+        const customRemindersJson = await AsyncStorage.getItem('custom_reminders');
+        if (customRemindersJson) {
+          const customReminders = JSON.parse(customRemindersJson);
+          // Mark custom reminders
+          const markedCustomReminders = customReminders.map((r: Reminder) => ({...r, isCustom: true}));
+          setReminders(prev => [...prev, ...markedCustomReminders]);
+        }
       } catch (e) {
         console.error('Failed to load preferences.', e);
       }
@@ -131,39 +152,6 @@ export default function RemindScreen() {
       return false;
     }
     return true;
-  };
-
-  const sendTestNotification = async () => {
-    setIsSending(true);
-    try {
-      const hasPermission = await requestPermissions();
-      if (!hasPermission) {
-        setIsSending(false);
-        return;
-      }
-      
-      const { dailyGoal, currentIntake } = useHydrationStore.getState();
-      const percentage = Math.min(Math.round((currentIntake / dailyGoal) * 100), 100);
-      
-      // Using scheduleNotificationAsync with null trigger to show immediately
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "Stay Hydrated!",
-          body: "Drink 1 glass of water",
-          data: { percentage },
-          categoryIdentifier: 'hydration_reminder',
-          sound: 'default',
-        },
-        trigger: null, // Show immediately
-      });
-      
-      Alert.alert('Success', 'Test notification sent. You should see it shortly.');
-    } catch (error) {
-      console.error('Failed to send notification:', error);
-      Alert.alert('Error', 'Could not send test notification. Please check permissions.');
-    } finally {
-      setIsSending(false);
-    }
   };
 
   const scheduleReminderNotification = async (minutesLater: number) => {
@@ -227,9 +215,107 @@ export default function RemindScreen() {
       if (reminderToUpdate) {
         await scheduleNotification(reminderToUpdate.hour, reminderToUpdate.minute, value, reminderToUpdate.id);
       }
+      
+      // Update custom reminders in storage if this is a custom reminder
+      if (reminderId.startsWith('custom_')) {
+        const customReminders = updatedReminders.filter(r => r.id.startsWith('custom_'));
+        await AsyncStorage.setItem('custom_reminders', JSON.stringify(customReminders));
+      }
     } catch (e) {
       console.error('Failed to save preference or schedule notification.', e);
     }
+  };
+  
+  const handleConfirmDateTime = async (date: Date) => {
+    setDatePickerVisibility(false); // Hide modal first as per docs
+    try {
+      // Use the selected time from state
+      const hour = date.getHours();
+      const minute = date.getMinutes();
+      const timeLabel = formatTime(hour, minute);
+      const id = `custom_${Date.now()}`;
+      
+      const newReminder: Reminder = {
+        id,
+        timeLabel,
+        hour,
+        minute,
+        enabled: true,
+        isCustom: true
+      };
+      
+      const updatedReminders = [...reminders, newReminder];
+      setReminders(updatedReminders);
+      
+      // Save to AsyncStorage
+      await AsyncStorage.setItem(`reminder_${id}`, 'true');
+      
+      // Schedule the notification
+      await scheduleNotification(hour, minute, true, id);
+      
+      // Update custom reminders in storage
+      const customReminders = updatedReminders.filter(r => r.id.startsWith('custom_'));
+      await AsyncStorage.setItem('custom_reminders', JSON.stringify(customReminders));
+      
+      // Use setTimeout for Alert as per docs for iOS
+      setTimeout(() => Alert.alert('Success', `Reminder set for ${timeLabel}`), 0);
+
+    } catch (e) {
+      console.error('Failed to add custom reminder:', e);
+      setTimeout(() => Alert.alert('Error', 'Could not add custom reminder. Please try again.'),0);
+    }
+  };
+
+  const hideDatePicker = () => {
+    setDatePickerVisibility(false);
+  };
+
+  const showDatePicker = () => {
+    setSelectedTime(new Date()); // Reset to current time or a default
+    setDatePickerVisibility(true);
+  };
+
+  const deleteReminder = async (reminderId: string) => {
+    try {
+      // Can only delete custom reminders
+      if (!reminderId.startsWith('custom_')) {
+        Alert.alert('Notice', 'Default reminders cannot be deleted. You can turn them off instead.');
+        return;
+      }
+      
+      // Cancel any scheduled notifications
+      await Notifications.cancelScheduledNotificationAsync(`reminder_${reminderId}`);
+      
+      // Remove from AsyncStorage
+      await AsyncStorage.removeItem(`reminder_${reminderId}`);
+      
+      // Update state
+      const updatedReminders = reminders.filter(r => r.id !== reminderId);
+      setReminders(updatedReminders);
+      
+      // Update custom reminders in storage
+      const customReminders = updatedReminders.filter(r => r.id.startsWith('custom_'));
+      await AsyncStorage.setItem('custom_reminders', JSON.stringify(customReminders));
+      
+      Alert.alert('Success', 'Reminder deleted');
+    } catch (e) {
+      console.error('Failed to delete reminder:', e);
+      Alert.alert('Error', 'Could not delete reminder. Please try again.');
+    }
+  };
+
+  const renderRightActions = (reminderId: string, isCustom?: boolean) => {
+    if (!isCustom) return null;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.deleteAction}
+        onPress={() => deleteReminder(reminderId)}
+      >
+        <Ionicons name="trash-outline" size={24} color="#ffffff" />
+        <ThemedText style={styles.deleteActionText}>Delete</ThemedText>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -241,38 +327,53 @@ export default function RemindScreen() {
 
         <View style={styles.card}>
           {reminders.map((reminder) => (
-            <View key={reminder.id} style={styles.reminderRow}>
-              <Ionicons 
-                name={reminder.enabled ? "notifications" : "notifications-outline"} 
-                size={26} 
-                color={reminder.enabled ? "#3b82f6" : "#9ca3af"} // Blue if enabled, gray if not
-                style={styles.reminderIcon} 
-              />
-              <ThemedText style={styles.reminderText}>{reminder.timeLabel}</ThemedText>
-              <Switch
-                trackColor={{ false: '#d1d5db', true: '#60a5fa' }}
-                thumbColor={reminder.enabled ? '#3b82f6' : '#f4f3f4'}
-                ios_backgroundColor="#e5e7eb"
-                onValueChange={(newValue) => toggleSwitch(reminder.id, newValue)}
-                value={reminder.enabled}
-              />
-            </View>
+            <Swipeable
+              key={reminder.id}
+              renderRightActions={() => renderRightActions(reminder.id, reminder.isCustom)}
+              friction={2}
+              rightThreshold={40}
+            >
+              <View style={styles.reminderRow}>
+                <Ionicons 
+                  name={reminder.enabled ? "notifications" : "notifications-outline"} 
+                  size={26} 
+                  color={reminder.enabled ? "#3b82f6" : "#9ca3af"} // Blue if enabled, gray if not
+                  style={styles.reminderIcon} 
+                />
+                <ThemedText style={styles.reminderText}>{reminder.timeLabel}</ThemedText>
+                <Switch
+                  trackColor={{ false: '#d1d5db', true: '#60a5fa' }}
+                  thumbColor={reminder.enabled ? '#3b82f6' : '#f4f3f4'}
+                  ios_backgroundColor="#e5e7eb"
+                  onValueChange={(newValue) => toggleSwitch(reminder.id, newValue)}
+                  value={reminder.enabled}
+                />
+              </View>
+            </Swipeable>
           ))}
         </View>
         
-        <View style={styles.testButtonContainer}>
+        <View style={styles.addButtonContainer}>
           <TouchableOpacity 
-            style={styles.testButton}
-            onPress={sendTestNotification}
-            disabled={isSending}
+            style={styles.customButton}
+            onPress={showDatePicker}
           >
-            <Ionicons name="notifications" size={24} color="#ffffff" style={styles.buttonIcon} />
-            <ThemedText style={styles.testButtonText}>
-              {isSending ? "Sending..." : "Send Test Notification"}
+            <Ionicons name="add-circle" size={24} color="#ffffff" style={styles.buttonIcon} />
+            <ThemedText style={styles.customButtonText}>
+              Add Custom Reminder
             </ThemedText>
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      <DateTimePickerModal
+        isVisible={isDatePickerVisible}
+        mode="time"
+        onConfirm={handleConfirmDateTime}
+        onCancel={hideDatePicker}
+        date={selectedTime}
+        is24Hour={false}
+      />
     </ThemedView>
   );
 }
@@ -321,6 +422,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    backgroundColor: '#ffffff',
   },
   reminderIcon: {
     marginRight: 15,
@@ -330,11 +432,11 @@ const styles = StyleSheet.create({
     color: '#374151',
     flex: 1,
   },
-  testButtonContainer: {
+  addButtonContainer: {
     width: '100%',
     marginTop: 10,
   },
-  testButton: {
+  customButton: {
     backgroundColor: '#3b82f6',
     paddingVertical: 16,
     paddingHorizontal: 24,
@@ -345,12 +447,25 @@ const styles = StyleSheet.create({
     width: '100%',
     ...CARD_SHADOW,
   },
-  testButtonText: {
+  customButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
   buttonIcon: {
     marginRight: 8,
+  },
+  deleteAction: {
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+    height: '100%',
+    flexDirection: 'row',
+  },
+  deleteActionText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    marginLeft: 5,
   },
 }); 

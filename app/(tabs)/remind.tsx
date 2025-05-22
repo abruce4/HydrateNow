@@ -1,20 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Switch, Platform, TouchableOpacity, Text } from 'react-native';
+import { StyleSheet, View, Switch, Platform, TouchableOpacity, Alert } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
+import useHydrationStore from '@/stores/hydrationStore';
 
-// Configure notification handler
+// Configure notification handler with custom appearance
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async () => {
+    const { dailyGoal, currentIntake } = useHydrationStore.getState();
+    const percentage = Math.min(Math.round((currentIntake / dailyGoal) * 100), 100);
+    
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      // New iOS options will be used in the presentation
+    };
+  },
 });
 
 const CARD_SHADOW = {
@@ -41,8 +48,34 @@ const initialReminders: Reminder[] = [
   { id: '8pm', timeLabel: '20:00', hour: 20, minute: 0, enabled: false },
 ];
 
+// Create a notification category for interactive notifications
+async function setupNotificationCategories() {
+  await Notifications.setNotificationCategoryAsync('hydration_reminder', [
+    {
+      identifier: 'done',
+      buttonTitle: 'Done',
+      options: {
+        isDestructive: false,
+        isAuthenticationRequired: false,
+        opensAppToForeground: true,
+      },
+    },
+    {
+      identifier: 'remind_later',
+      buttonTitle: 'Remind me later',
+      options: {
+        isDestructive: false,
+        isAuthenticationRequired: false,
+        opensAppToForeground: false,
+      },
+    },
+  ]);
+}
+
 export default function RemindScreen() {
   const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
+  const { dailyGoal, currentIntake, addIntake } = useHydrationStore();
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -58,33 +91,119 @@ export default function RemindScreen() {
         console.error('Failed to load preferences.', e);
       }
     };
+    
     loadPreferences();
     requestPermissions();
+    setupNotificationCategories();
+    
+    // Set up notification response listener
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      if (response.actionIdentifier === 'done') {
+        // User marked as done, add a glass of water (250ml)
+        addIntake(250);
+        Alert.alert('Great job!', '250ml of water added to your daily intake.');
+      } else if (response.actionIdentifier === 'remind_later') {
+        // Schedule a reminder for 30 minutes later
+        scheduleReminderNotification(30);
+      }
+    });
+    
+    return () => {
+      responseListener.remove();
+    };
   }, []);
 
   const requestPermissions = async () => {
     if (Platform.OS === 'android') {
-      await Notifications.getPermissionsAsync(); // Ensure channel is created on Android
+      await Notifications.setNotificationChannelAsync('hydration_reminders', {
+        name: 'Hydration Reminders',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#3b82f6',
+        sound: 'default',
+      });
     }
+    
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
-      alert('Failed to get push token for push notification!');
-      return;
+      Alert.alert('Permission Required', 'Please enable notifications to receive hydration reminders.');
+      return false;
     }
+    return true;
+  };
+
+  const sendTestNotification = async () => {
+    setIsSending(true);
+    try {
+      const hasPermission = await requestPermissions();
+      if (!hasPermission) {
+        setIsSending(false);
+        return;
+      }
+      
+      const { dailyGoal, currentIntake } = useHydrationStore.getState();
+      const percentage = Math.min(Math.round((currentIntake / dailyGoal) * 100), 100);
+      
+      // Using scheduleNotificationAsync with null trigger to show immediately
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Stay Hydrated!",
+          body: "Drink 1 glass of water",
+          data: { percentage },
+          categoryIdentifier: 'hydration_reminder',
+          sound: 'default',
+        },
+        trigger: null, // Show immediately
+      });
+      
+      Alert.alert('Success', 'Test notification sent. You should see it shortly.');
+    } catch (error) {
+      console.error('Failed to send notification:', error);
+      Alert.alert('Error', 'Could not send test notification. Please check permissions.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const scheduleReminderNotification = async (minutesLater: number) => {
+    const { dailyGoal, currentIntake } = useHydrationStore.getState();
+    const percentage = Math.min(Math.round((currentIntake / dailyGoal) * 100), 100);
+    
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Stay Hydrated!",
+        body: "Drink 1 glass of water",
+        data: { percentage },
+        categoryIdentifier: 'hydration_reminder',
+        sound: 'default',
+      },
+      trigger: {
+        seconds: minutesLater * 60,
+        channelId: 'hydration_reminders',
+      },
+    });
   };
 
   const scheduleNotification = async (hour: number, minute: number, enabled: boolean, id: string) => {
     const notificationId = `reminder_${id}`;
+    
     if (enabled) {
+      const { dailyGoal, currentIntake } = useHydrationStore.getState();
+      const percentage = Math.min(Math.round((currentIntake / dailyGoal) * 100), 100);
+      
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "💧 Time to Hydrate! 💧",
-          body: 'Don\'t forget to drink some water.',
+          title: "Stay Hydrated!",
+          body: "Drink 1 glass of water",
+          data: { percentage },
+          categoryIdentifier: 'hydration_reminder',
+          sound: 'default',
         },
         trigger: {
           hour: hour,
           minute: minute,
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          repeats: true,
+          channelId: 'hydration_reminders',
         },
         identifier: notificationId,
       });
@@ -137,6 +256,19 @@ export default function RemindScreen() {
           </View>
         ))}
       </View>
+      
+      <View style={styles.testButtonContainer}>
+        <TouchableOpacity 
+          style={styles.testButton}
+          onPress={sendTestNotification}
+          disabled={isSending}
+        >
+          <Ionicons name="notifications" size={24} color="#ffffff" style={styles.buttonIcon} />
+          <ThemedText style={styles.testButtonText}>
+            {isSending ? "Sending..." : "Send Test Notification"}
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
     </ThemedView>
   );
 }
@@ -187,5 +319,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#374151',
     flex: 1,
+  },
+  testButtonContainer: {
+    width: '100%',
+    paddingHorizontal: 15,
+    marginTop: 10,
+  },
+  testButton: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    ...CARD_SHADOW,
+  },
+  testButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
 }); 

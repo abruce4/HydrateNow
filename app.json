@@ -15,7 +15,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.hydratenow",
+      "bundleIdentifier": "com.abruce4.hydratenow",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses camera for [your reason]",
@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/images/HydrateNow.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.hydratenow",
+      "package": "com.abruce4.hydratenow",
       "versionCode": 1,
       "permissions": [
         "NOTIFICATIONS"

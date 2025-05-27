@@ -332,10 +332,6 @@ const VideoViewWithPlayer = ({ player, itemLabel }: { player: VideoPlayer; itemL
   useEffect(() => {
     // Check if status is an object and not null, then check for didJustFinish
     if (typeof status === 'object' && status !== null && (status as any).didJustFinish) {
-      // console.log(`Video ${itemLabel} ended`); // Optional: for debugging
-      // Video has finished playing. You might want to:
-      // player.pause();
-      // player.currentTime = 0;
     }
   }, [status, itemLabel, player]);
 

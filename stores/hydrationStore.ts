@@ -136,6 +136,7 @@ const useHydrationStore = create<HydrationState>()(
       getWeeklyData: () => {
         const state = get();
         const today = new Date();
+        const todayString = getFormattedDate(today);
         const result = [];
         
         // Get data for the past 7 days (including today)
@@ -144,14 +145,20 @@ const useHydrationStore = create<HydrationState>()(
           date.setDate(date.getDate() - i);
           const dateString = getFormattedDate(date);
           
-          // Find record for this date
-          const record = state.dailyRecords.find(r => r.date === dateString);
+          let value = 0;
+          if (dateString === todayString) {
+            // Use currentIntake for today's value
+            value = state.currentIntake;
+          } else {
+            // Find record for this date
+            const record = state.dailyRecords.find(r => r.date === dateString);
+            value = record?.intake || 0;
+          }
           
-          // Add data point (use 0 if no record exists)
           result.push({
             date: dateString,
             label: getDayOfWeekAbbr(dateString),
-            value: record?.intake || 0
+            value: value
           });
         }
         

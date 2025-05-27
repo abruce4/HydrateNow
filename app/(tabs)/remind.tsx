@@ -203,10 +203,8 @@ export default function RemindScreen() {
         },
         identifier: notificationId,
       });
-      console.log(`Notification ${notificationId} scheduled for ${hour}:${minute}`);
     } else {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
-      console.log(`Notification ${notificationId} cancelled`);
     }
   };
 

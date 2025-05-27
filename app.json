@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "HydrateNow",
+    "name": "Hydration Tracker: HydrateNow",
     "slug": "hydratenow",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,14 +9,18 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "privacy": "public",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yourcompany.hydratenow",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses camera for [your reason]",
-        "NSLocationWhenInUseUsageDescription": "This app uses location for [your reason]"
+        "NSLocationWhenInUseUsageDescription": "This app uses location for [your reason]",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -58,6 +62,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "672943f6-6561-4bca-ae20-82432a35eb32"
+      }
+    },
+    "owner": "abruce4"
   }
 }

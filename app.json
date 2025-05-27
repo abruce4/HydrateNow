@@ -28,7 +28,8 @@
       "versionCode": 1,
       "permissions": [
         "NOTIFICATIONS"
-      ]
+      ],
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "bundler": "metro",
@@ -57,11 +58,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "your-project-id-here"
-      }
     }
   }
 }

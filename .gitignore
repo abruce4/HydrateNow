@@ -36,4 +36,7 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Service Account
+hydratenow-461201-b43a48a4c0d1.json
+
 app-example
